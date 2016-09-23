@@ -1,11 +1,11 @@
-module GeoJson exposing (..)
+module GeoJson exposing (Bbox, Crs(..), FeatureObject, GeoJson, GeoJsonObject(..), Geometry(..), Position, decode)
 
 {-| Module docs here.
-@docs Bbox, Crs, FeatureObject, GeoJson, GeoJsonObject, Geometry, Position
+@docs decode,Bbox, Crs, FeatureObject, GeoJson, GeoJsonObject, Geometry, Position
 -}
 
 import Json.Encode as Json
-import Json.Decode as D exposing (Decoder)
+import Json.Decode as D exposing (Decoder, (:=))
 
 
 {-| A Coordinate Reference System may be either JSON `null`, a name, or a link
@@ -83,3 +83,54 @@ one avoids Maybes when working with a 2D dataset.
 -}
 type alias Position =
     ( Float, Float, List Float )
+
+
+{-| Decode GeoJSON into Elm.
+-}
+decode : Decoder GeoJson
+decode =
+    D.object3 (,,) decodeGeoJson (D.maybe decodeCrs) (D.maybe decodeBbox)
+
+
+decodeGeoJson : Decoder GeoJsonObject
+decodeGeoJson =
+    Debug.crash "TODO"
+
+
+decodeCrs : Decoder Crs
+decodeCrs =
+    D.oneOf
+        [ D.null Null
+        , ("type" := D.string)
+            `D.andThen`
+                (\tipe ->
+                    if tipe == "name" then
+                        D.object1 Name
+                            (D.at [ "properties", "name" ] D.string)
+                    else if tipe == "link" then
+                        D.object2 Link
+                            (D.at [ "properties", "href" ] D.string)
+                            (D.at [ "properties", "type" ] D.string |> D.maybe)
+                    else
+                        D.fail <| "Unrecognized CRS type: " ++ tipe
+                )
+        ]
+
+
+decodeBbox : Decoder Bbox
+decodeBbox =
+    D.list D.float
+
+
+decodePosition : Decoder Position
+decodePosition =
+    D.list D.float
+        `D.andThen`
+            (\ps ->
+                case ps of
+                    p1 :: p2 :: more ->
+                        D.succeed ( p1, p2, more )
+
+                    _ ->
+                        D.fail "Array has too few numbers to make a position"
+            )
