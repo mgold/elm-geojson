@@ -1,7 +1,7 @@
-module GeoJson exposing (Bbox, Crs(..), FeatureObject, GeoJson, GeoJsonObject(..), Geometry(..), Position, decode)
+module GeoJson exposing (Bbox, Crs(..), FeatureObject, GeoJson, GeoJsonObject(..), Geometry(..), Position, decoder)
 
 {-| Module docs here.
-@docs decode,Bbox, Crs, FeatureObject, GeoJson, GeoJsonObject, Geometry, Position
+@docs decoder, Bbox, Crs, FeatureObject, GeoJson, GeoJsonObject, Geometry, Position
 -}
 
 import Json.Encode as Json
@@ -33,13 +33,12 @@ type alias GeoJson =
 
 
 {-| A GeoJsonObject contains the primary data, and is either a `Geometry`, a
-`FeatureObject`, or a list of `FeatureObjects`. Note the prime on
-`FeatureObject'` to prevent a collision with the `FeatureObject` record
-constructor.
+`FeatureObject`, or a list of `FeatureObjects`.
 -}
 type GeoJsonObject
     = Geometry Geometry
-    | FeatureObject' FeatureObject
+      -- Feature not FeatureObject to avoid name collision
+    | Feature FeatureObject
     | FeatureCollection (List FeatureObject)
 
 
@@ -72,7 +71,7 @@ type Geometry
     | LineString (List Position)
     | MultiLineString (List (List Position))
     | Polygon (List (List Position))
-    | MutliPolygon (List (List (List Position)))
+    | MultiPolygon (List (List (List Position)))
     | GeometryCollection (List Geometry)
 
 
@@ -87,14 +86,81 @@ type alias Position =
 
 {-| Decode GeoJSON into Elm.
 -}
-decode : Decoder GeoJson
-decode =
-    D.object3 (,,) decodeGeoJson (D.maybe decodeCrs) (D.maybe decodeBbox)
+decoder : Decoder GeoJson
+decoder =
+    D.object3 (,,)
+        (("type" := D.string) `D.andThen` decodeGeoJson)
+        (D.maybe decodeCrs)
+        (D.maybe decodeBbox)
 
 
-decodeGeoJson : Decoder GeoJsonObject
-decodeGeoJson =
-    Debug.crash "TODO"
+decodeGeoJson : String -> Decoder GeoJsonObject
+decodeGeoJson tipe =
+    let
+        helper tipe =
+            case tipe of
+                "Feature" ->
+                    D.map Feature decodeFeature
+
+                "FeatureCollection" ->
+                    D.map FeatureCollection (D.list decodeFeature)
+
+                _ ->
+                    D.map Geometry decodeGeometry
+    in
+        ("type" := D.string) `D.andThen` helper
+
+
+decodeFeature : Decoder FeatureObject
+decodeFeature =
+    D.object3 FeatureObject
+        ("geometry"
+            := D.oneOf
+                [ D.null Nothing
+                , decodeGeometry |> D.map Just
+                ]
+        )
+        ("properties" := D.value)
+        ("id" := D.maybe D.string)
+
+
+decodeGeometry : Decoder Geometry
+decodeGeometry =
+    let
+        helper tipe =
+            case tipe of
+                "Point" ->
+                    ("coordinates" := decodePosition)
+                        |> D.map Point
+
+                "MultiPoint" ->
+                    ("coordinates" := D.list decodePosition)
+                        |> D.map MultiPoint
+
+                "LineString" ->
+                    ("coordinates" := D.list decodePosition)
+                        |> D.map LineString
+
+                "MultiLineString" ->
+                    ("coordinates" := D.list (D.list decodePosition))
+                        |> D.map MultiLineString
+
+                "Polygon" ->
+                    ("coordinates" := D.list (D.list decodePosition))
+                        |> D.map Polygon
+
+                "MultiPolygon" ->
+                    ("coordinates" := D.list (D.list (D.list decodePosition)))
+                        |> D.map MultiPolygon
+
+                "GeometryCollection" ->
+                    ("geometries" := D.list decodeGeometry)
+                        |> D.map GeometryCollection
+
+                _ ->
+                    D.fail <| "Unrecognized 'type': " ++ tipe
+    in
+        ("type" := D.string) `D.andThen` helper
 
 
 decodeCrs : Decoder Crs
