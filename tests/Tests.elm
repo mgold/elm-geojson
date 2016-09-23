@@ -1,14 +1,51 @@
 module Tests exposing (..)
 
 import Test exposing (..)
-import Expect
+import Expect exposing (Expectation)
 import GeoJson exposing (GeoJsonObject(..), Geometry(..), decoder)
 import Json.Decode exposing (decodeString)
 
 
 all : Test
 all =
-    concat [ geometryExamples ]
+    concat [ expectedFailures, geometryExamples ]
+
+
+expectErr : Result a b -> Expectation
+expectErr r =
+    case r of
+        Ok _ ->
+            Expect.fail <| "Expected an Err but got " ++ toString r
+
+        Err _ ->
+            Expect.pass
+
+
+expectedFailures : Test
+expectedFailures =
+    describe "Invalid GeoJSON"
+        [ test "Invalid type" <|
+            \() ->
+                let
+                    json =
+                        """{"type": "NotAnActualType"}"""
+                in
+                    decodeString decoder json |> expectErr
+        , test "No coordinates" <|
+            \() ->
+                let
+                    json =
+                        """{"type": "Point"}"""
+                in
+                    decodeString decoder json |> expectErr
+        , test "Not enough indices in position " <|
+            \() ->
+                let
+                    json =
+                        """{"type": "Point", "coordinates": [1]}"""
+                in
+                    decodeString decoder json |> expectErr
+        ]
 
 
 geometryExamples : Test
