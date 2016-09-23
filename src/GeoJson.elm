@@ -200,3 +200,120 @@ decodePosition =
                     _ ->
                         D.fail "Array has too few numbers to make a position"
             )
+
+
+{-| encode GeoJSON into Elm.
+-}
+encode : GeoJson -> Json.Value
+encode ( geojson, crs, bbox ) =
+    Json.object <| encodeGeoJson geojson ++ encodeCrs crs ++ encodeBbox bbox
+
+
+encodeGeoJson : GeoJsonObject -> List ( String, Json.Value )
+encodeGeoJson geojson =
+    case geojson of
+        Feature feature ->
+            encodeFeature feature
+
+        FeatureCollection features ->
+            [ ( "type", Json.string "FeatureCollection" )
+            , ( "features", features |> List.map (encodeFeature >> Json.object) |> Json.list )
+            ]
+
+        Geometry geometry ->
+            encodeGeometry geometry
+
+
+encodeFeature : FeatureObject -> List ( String, Json.Value )
+encodeFeature { geometry, properties, id } =
+    let
+        encodedId =
+            case id of
+                Nothing ->
+                    []
+
+                Just theId ->
+                    [ ( "id", Json.string theId ) ]
+    in
+        [ ( "type", Json.string "Feature" )
+        , ( "geometry", geometry |> Maybe.map (encodeGeometry >> Json.object) |> Maybe.withDefault Json.null )
+        , ( "properties", properties )
+        ]
+            ++ encodedId
+
+
+encodeGeometry : Geometry -> List ( String, Json.Value )
+encodeGeometry geom =
+    case geom of
+        Point data ->
+            [ ( "type", Json.string "Point" )
+            , ( "coordinates", encodePosition data )
+            ]
+
+        MultiPoint data ->
+            [ ( "type", Json.string "MultiPoint" )
+            , ( "coordinates", data |> List.map encodePosition |> Json.list )
+            ]
+
+        LineString data ->
+            [ ( "type", Json.string "LineString" )
+            , ( "coordinates", data |> List.map encodePosition |> Json.list )
+            ]
+
+        MultiLineString data ->
+            Debug.crash "TODO"
+
+        Polygon data ->
+            Debug.crash "TODO"
+
+        MultiPolygon data ->
+            Debug.crash "TODO"
+
+        GeometryCollection data ->
+            Debug.crash "TODO"
+
+
+encodeCrs : Maybe Crs -> List ( String, Json.Value )
+encodeCrs maybeCrs =
+    let
+        helper crs =
+            case crs of
+                Null ->
+                    Json.null
+
+                Name name ->
+                    Json.object
+                        [ ( "type", Json.string "name" )
+                        , ( "properties", Json.object [ ( "name", Json.string name ) ] )
+                        ]
+
+                Link href tipe ->
+                    Json.object
+                        [ ( "type", Json.string "link" )
+                        , ( "properties"
+                          , Json.object <|
+                                [ ( "href", Json.string href ) ]
+                                    ++ (tipe |> Maybe.map (\t -> [ ( "type", Json.string t ) ]) |> Maybe.withDefault [])
+                          )
+                        ]
+    in
+        case maybeCrs of
+            Nothing ->
+                []
+
+            Just crs ->
+                [ ( "crs", helper crs ) ]
+
+
+encodeBbox : Maybe Bbox -> List ( String, Json.Value )
+encodeBbox bbox =
+    bbox
+        |> Maybe.map (\b -> [ ( "bbox", b |> List.map Json.float |> Json.list ) ])
+        |> Maybe.withDefault []
+
+
+encodePosition : Position -> Json.Value
+encodePosition ( a, b, more ) =
+    (a :: b :: more)
+        |> List.map Json.float
+        |> Json.list
