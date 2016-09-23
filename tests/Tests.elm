@@ -2,13 +2,92 @@ module Tests exposing (..)
 
 import Test exposing (..)
 import Expect exposing (Expectation)
-import GeoJson exposing (GeoJsonObject(..), Geometry(..), decoder)
+import GeoJson exposing (GeoJson, GeoJsonObject(..), Geometry(..), FeatureObject, Position, Crs(..), Bbox, decoder)
 import Json.Decode exposing (decodeString)
+import Json.Encode
+import Fuzz exposing (Fuzzer)
 
 
 all : Test
 all =
-    concat [ expectedFailures, geometryExamples ]
+    concat [ geometryExamples, expectedFailures, encodeAndDecode ]
+
+
+encodeAndDecode : Test
+encodeAndDecode =
+    fuzzWith { runs = 50 } fuzzGeoJson "encoding and decoding does not change the GeoJson" <|
+        \geojson ->
+            GeoJson.encode geojson |> Json.Decode.decodeValue decoder |> Expect.equal (Ok geojson)
+
+
+fuzzGeoJson : Fuzzer GeoJson
+fuzzGeoJson =
+    Fuzz.tuple3
+        ( fuzzGeoJsonObject
+        , (Fuzz.maybe fuzzCrs)
+        , (Fuzz.maybe fuzzBbox)
+        )
+
+
+fuzzGeoJsonObject =
+    Fuzz.frequencyOrCrash
+        [ ( 1, Fuzz.map FeatureCollection (Fuzz.list fuzzFeature) )
+        , ( 1, Fuzz.map Feature fuzzFeature )
+        , ( 7, Fuzz.map Geometry fuzzGeometry )
+        ]
+
+
+fuzzFeature : Fuzzer FeatureObject
+fuzzFeature =
+    Fuzz.map3 FeatureObject
+        (Fuzz.maybe fuzzGeometry)
+        (Fuzz.constant (Json.Encode.object []))
+        (Fuzz.maybe Fuzz.string)
+
+
+fuzzGeometry : Fuzzer Geometry
+fuzzGeometry =
+    let
+        helper depth =
+            Fuzz.frequencyOrCrash
+                [ ( 1, Fuzz.map Point fuzzPosition )
+                , ( 1, Fuzz.map MultiPoint (Fuzz.list fuzzPosition) )
+                , ( 1, Fuzz.map LineString (Fuzz.list fuzzPosition) )
+                , ( 1, Fuzz.map MultiLineString (Fuzz.list (Fuzz.list fuzzPosition)) )
+                , ( 1, Fuzz.map Polygon (Fuzz.list (Fuzz.list fuzzPosition)) )
+                , ( 1, Fuzz.map (\xs -> MultiPolygon [ xs ]) (Fuzz.list (Fuzz.list fuzzPosition)) )
+                , if depth > 3 then
+                    ( 0, Fuzz.constant (Point ( 1, 2, [] )) )
+                  else
+                    ( 1 / depth, Fuzz.map GeometryCollection (Fuzz.list (helper (depth + 1))) )
+                ]
+    in
+        helper 1
+
+
+fuzzPosition : Fuzzer Position
+fuzzPosition =
+    Fuzz.map2 (\a b -> ( a, b, [] )) Fuzz.float Fuzz.float
+
+
+fuzzCrs : Fuzzer Crs
+fuzzCrs =
+    Fuzz.frequencyOrCrash
+        [ ( 1, Fuzz.constant Null )
+        , ( 1, Fuzz.map Name Fuzz.string )
+        , ( 1, Fuzz.map2 Link Fuzz.string (Fuzz.maybe Fuzz.string) )
+        ]
+
+
+fuzzBbox : Fuzzer Bbox
+fuzzBbox =
+    Fuzz.tuple4
+        ( Fuzz.float
+        , Fuzz.float
+        , Fuzz.float
+        , Fuzz.float
+        )
+        |> Fuzz.map (\( a, b, c, d ) -> [ a, b, c, d ])
 
 
 expectErr : Result a b -> Expectation

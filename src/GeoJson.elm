@@ -1,7 +1,29 @@
-module GeoJson exposing (Bbox, Crs(..), FeatureObject, GeoJson, GeoJsonObject(..), Geometry(..), Position, decoder)
+module GeoJson exposing (Bbox, Crs(..), FeatureObject, GeoJson, GeoJsonObject(..), Geometry(..), Position, decoder, encode)
 
-{-| Module docs here.
-@docs decoder, Bbox, Crs, FeatureObject, GeoJson, GeoJsonObject, Geometry, Position
+{-| Decode GeoJson into an Elm data structure where you can operate on it
+further.
+
+After using `GeoJson.decoder` you can either traverse the data structure
+directly (recommended if you're working with 2D positions and not using
+properties) or use `Json.Decode.andThen` to transform it into a more convenient
+representation (recommended if you find yourself with a lot of Maybes or
+impossible cases using the first approach). Also, GeoJSON objects may contain
+nonstandard top-level fields; you can run multiple decoders using
+`Json.Decode.object2` the way you'd use `map2`.
+
+An `encode` function is also provided, mostly for completeness and testing.
+Neither encoding nor decoding attempt to enforce minimum array lengths
+(excluding positions themselves).
+
+# Decoder
+@docs decoder
+
+# Elm Representation of GeoJSON
+All union types are fully exposed so you can inspect them as necessary.
+@docs GeoJson, GeoJsonObject, FeatureObject, Geometry, Position, Crs, Bbox
+
+# Encoding
+@docs encode
 -}
 
 import Json.Encode as Json
@@ -90,8 +112,8 @@ decoder : Decoder GeoJson
 decoder =
     D.object3 (,,)
         (("type" := D.string) `D.andThen` decodeGeoJson)
-        (D.maybe decodeCrs)
-        (D.maybe decodeBbox)
+        (D.maybe ("crs" := decodeCrs))
+        (D.maybe ("bbox" := decodeBbox))
 
 
 decodeGeoJson : String -> Decoder GeoJsonObject
@@ -103,7 +125,7 @@ decodeGeoJson tipe =
                     D.map Feature decodeFeature
 
                 "FeatureCollection" ->
-                    D.map FeatureCollection (D.list decodeFeature)
+                    D.map FeatureCollection ("features" := (D.list decodeFeature))
 
                 _ ->
                     D.map Geometry decodeGeometry
@@ -121,7 +143,7 @@ decodeFeature =
                 ]
         )
         ("properties" := D.value)
-        ("id" := D.maybe D.string)
+        (D.maybe ("id" := D.string))
 
 
 decodeGeometry : Decoder Geometry
@@ -261,16 +283,24 @@ encodeGeometry geom =
             ]
 
         MultiLineString data ->
-            Debug.crash "TODO"
+            [ ( "type", Json.string "MultiLineString" )
+            , ( "coordinates", data |> List.map (List.map encodePosition >> Json.list) |> Json.list )
+            ]
 
         Polygon data ->
-            Debug.crash "TODO"
+            [ ( "type", Json.string "Polygon" )
+            , ( "coordinates", data |> List.map (List.map encodePosition >> Json.list) |> Json.list )
+            ]
 
         MultiPolygon data ->
-            Debug.crash "TODO"
+            [ ( "type", Json.string "MultiPolygon" )
+            , ( "coordinates", data |> List.map (List.map (List.map encodePosition >> Json.list) >> Json.list) |> Json.list )
+            ]
 
         GeometryCollection data ->
-            Debug.crash "TODO"
+            [ ( "type", Json.string "GeometryCollection" )
+            , ( "geometries", data |> List.map (encodeGeometry >> Json.object) |> Json.list )
+            ]
 
 
 encodeCrs : Maybe Crs -> List ( String, Json.Value )
