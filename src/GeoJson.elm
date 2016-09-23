@@ -1,19 +1,20 @@
 module GeoJson exposing (..)
 
 {-| Module docs here.
-@docs Bbox, Crs, FeatureObject, GeoJson, GeoJsonObject, Geometry, Nullable, Position
+@docs Bbox, Crs, FeatureObject, GeoJson, GeoJsonObject, Geometry, Position
 -}
 
 import Json.Encode as Json
 import Json.Decode as D exposing (Decoder)
 
 
-{-| A Coordinate Reference System may be either a name, or a link containing an
-href and optionally a type. No attempt is made to validate that the href is a
-"dereferenceable URI".
+{-| A Coordinate Reference System may be either JSON `null`, a name, or a link
+containing an href and optionally a type. No attempt is made to validate that
+the href is a "dereferenceable URI".
 -}
 type Crs
-    = Name String
+    = Null
+    | Name String
     | Link String (Maybe String)
 
 
@@ -25,10 +26,10 @@ type alias Bbox =
     List Float
 
 
-{-| The root representation of GeoJSON in Elm. It consists of a `GeoJsonObject`, and optional nullable `Crs`, and an optional `Bbox`. Note that a `myGeoJson.crs == Nothing` means that no CRS was present in the JSON, and `myGeoJson.crs == Just Null` means that it was `null`, and therefore "no CRS can be assumed".
+{-| The root representation of GeoJSON in Elm. It consists of a `GeoJsonObject`, and optional `Crs`, and an optional `Bbox`. Note that a `myGeoJson.crs == Nothing` means that no CRS was present in the JSON, and `myGeoJson.crs == Just Null` means that it was `null`, and therefore "no CRS can be assumed".
 -}
 type alias GeoJson =
-    ( GeoJsonObject, Maybe (Nullable Crs), Maybe Bbox )
+    ( GeoJsonObject, Maybe Crs, Maybe Bbox )
 
 
 {-| A GeoJsonObject contains the primary data, and is either a `Geometry`, a
@@ -43,13 +44,14 @@ type GeoJsonObject
 
 
 {-| A `FeatureObject` represents a geographic feature. The `geometry` field is
-allowed to have `null` instead of actual geometry. The `properties` may be any
-JSON object or `null` but no attempt is made to inspect them. The `id` is an
-optional "commonly used identifier", and has been taken to be a string even
-though the spec does not say so explicitly.
+allowed to have `null` instead of actual geometry, which is represented as
+`Nothing`. The `properties` may be any JSON object or `null` but no attempt
+is made to inspect them. The `id` is an optional "commonly used identifier",
+and has been taken to be a string even though the spec does not say so
+explicitly.
 -}
 type alias FeatureObject =
-    { geometry : Nullable Geometry
+    { geometry : Maybe Geometry
     , properties : Json.Value
     , id : Maybe String
     }
@@ -81,11 +83,3 @@ one avoids Maybes when working with a 2D dataset.
 -}
 type alias Position =
     ( Float, Float, List Float )
-
-
-{-| When a value is optional, it is represented as `Maybe`. Where the
-specification allows for `null`, it is represented in Elm using this type.
--}
-type Nullable a
-    = Value a
-    | Null
