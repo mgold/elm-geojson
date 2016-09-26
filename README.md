@@ -1,5 +1,5 @@
 # elm-geojson
-**Status**: Experimental, not yet released to elm-package, but please try it (copy the source file) and report back!
+**Status**: Experimental, not yet released to elm-package. Based on the original spec and not the RFC (TODO: fix that). But please try it (copy the source file) and report back!
 
 A library to decode (and encode) geoJson into a format that's nice to use in Elm.
 
