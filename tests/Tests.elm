@@ -2,7 +2,7 @@ module Tests exposing (..)
 
 import Test exposing (..)
 import Expect exposing (Expectation)
-import GeoJson exposing (GeoJson, GeoJsonObject(..), Geometry(..), FeatureObject, Position, Crs(..), Bbox, decoder)
+import GeoJson exposing (GeoJson, GeoJsonObject(..), Geometry(..), FeatureObject, Position, Bbox, decoder)
 import Json.Decode exposing (decodeString)
 import Json.Encode
 import Fuzz exposing (Fuzzer)
@@ -22,10 +22,9 @@ encodeAndDecode =
 
 fuzzGeoJson : Fuzzer GeoJson
 fuzzGeoJson =
-    Fuzz.tuple3
+    Fuzz.tuple
         ( fuzzGeoJsonObject
-        , (Fuzz.maybe fuzzCrs)
-        , (Fuzz.maybe fuzzBbox)
+        , Fuzz.maybe fuzzBbox
         )
 
 
@@ -68,15 +67,6 @@ fuzzGeometry =
 fuzzPosition : Fuzzer Position
 fuzzPosition =
     Fuzz.map2 (\a b -> ( a, b, [] )) Fuzz.float Fuzz.float
-
-
-fuzzCrs : Fuzzer Crs
-fuzzCrs =
-    Fuzz.frequencyOrCrash
-        [ ( 1, Fuzz.constant Null )
-        , ( 1, Fuzz.map Name Fuzz.string )
-        , ( 1, Fuzz.map2 Link Fuzz.string (Fuzz.maybe Fuzz.string) )
-        ]
 
 
 fuzzBbox : Fuzzer Bbox
@@ -134,7 +124,7 @@ geometryExamples =
             test name <|
                 \() ->
                     decodeString decoder json
-                        |> Expect.equal (Ok ( Geometry expected, Nothing, Nothing ))
+                        |> Expect.equal (Ok ( Geometry expected, Nothing ))
     in
         describe "Geometry Examples from Appendix A of the specification"
             [ geomTest "Point"

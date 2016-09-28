@@ -1,4 +1,4 @@
-module GeoJson exposing (Bbox, Crs(..), FeatureObject, GeoJson, GeoJsonObject(..), Geometry(..), Position, decoder, encode)
+module GeoJson exposing (Bbox, FeatureObject, GeoJson, GeoJsonObject(..), Geometry(..), Position, decoder, encode)
 
 {-| Decode GeoJson into an Elm data structure where you can operate on it
 further.
@@ -20,7 +20,7 @@ Neither encoding nor decoding attempt to enforce minimum array lengths
 
 # Elm Representation of GeoJSON
 All union types are fully exposed so you can inspect them as necessary.
-@docs GeoJson, GeoJsonObject, FeatureObject, Geometry, Position, Crs, Bbox
+@docs GeoJson, GeoJsonObject, FeatureObject, Geometry, Position,  Bbox
 
 # Encoding
 @docs encode
@@ -28,16 +28,6 @@ All union types are fully exposed so you can inspect them as necessary.
 
 import Json.Encode as Json
 import Json.Decode as D exposing (Decoder, (:=))
-
-
-{-| A Coordinate Reference System may be either JSON `null`, a name, or a link
-containing an href and optionally a type. No attempt is made to validate that
-the href is a "dereferenceable URI".
--}
-type Crs
-    = Null
-    | Name String
-    | Link String (Maybe String)
 
 
 {-| A Bounding Box is represented as a simple list of floats. No attempt is made
@@ -48,10 +38,10 @@ type alias Bbox =
     List Float
 
 
-{-| The root representation of GeoJSON in Elm. It consists of a `GeoJsonObject`, and optional `Crs`, and an optional `Bbox`. Note that a `myGeoJson.crs == Nothing` means that no CRS was present in the JSON, and `myGeoJson.crs == Just Null` means that it was `null`, and therefore "no CRS can be assumed".
+{-| The root representation of GeoJSON in Elm. It consists of a `GeoJsonObject` and an optional `Bbox`.
 -}
 type alias GeoJson =
-    ( GeoJsonObject, Maybe Crs, Maybe Bbox )
+    ( GeoJsonObject, Maybe Bbox )
 
 
 {-| A GeoJsonObject contains the primary data, and is either a `Geometry`, a
@@ -110,9 +100,8 @@ type alias Position =
 -}
 decoder : Decoder GeoJson
 decoder =
-    D.object3 (,,)
+    D.object2 (,)
         (("type" := D.string) `D.andThen` decodeGeoJson)
-        (D.maybe ("crs" := decodeCrs))
         (D.maybe ("bbox" := decodeBbox))
 
 
@@ -185,26 +174,6 @@ decodeGeometry =
         ("type" := D.string) `D.andThen` helper
 
 
-decodeCrs : Decoder Crs
-decodeCrs =
-    D.oneOf
-        [ D.null Null
-        , ("type" := D.string)
-            `D.andThen`
-                (\tipe ->
-                    if tipe == "name" then
-                        D.object1 Name
-                            (D.at [ "properties", "name" ] D.string)
-                    else if tipe == "link" then
-                        D.object2 Link
-                            (D.at [ "properties", "href" ] D.string)
-                            (D.at [ "properties", "type" ] D.string |> D.maybe)
-                    else
-                        D.fail <| "Unrecognized CRS type: " ++ tipe
-                )
-        ]
-
-
 decodeBbox : Decoder Bbox
 decodeBbox =
     D.list D.float
@@ -227,8 +196,8 @@ decodePosition =
 {-| encode GeoJSON into Elm.
 -}
 encode : GeoJson -> Json.Value
-encode ( geojson, crs, bbox ) =
-    Json.object <| encodeGeoJson geojson ++ encodeCrs crs ++ encodeBbox bbox
+encode ( geojson, bbox ) =
+    Json.object <| encodeGeoJson geojson ++ encodeBbox bbox
 
 
 encodeGeoJson : GeoJsonObject -> List ( String, Json.Value )
@@ -301,38 +270,6 @@ encodeGeometry geom =
             [ ( "type", Json.string "GeometryCollection" )
             , ( "geometries", data |> List.map (encodeGeometry >> Json.object) |> Json.list )
             ]
-
-
-encodeCrs : Maybe Crs -> List ( String, Json.Value )
-encodeCrs maybeCrs =
-    let
-        helper crs =
-            case crs of
-                Null ->
-                    Json.null
-
-                Name name ->
-                    Json.object
-                        [ ( "type", Json.string "name" )
-                        , ( "properties", Json.object [ ( "name", Json.string name ) ] )
-                        ]
-
-                Link href tipe ->
-                    Json.object
-                        [ ( "type", Json.string "link" )
-                        , ( "properties"
-                          , Json.object <|
-                                [ ( "href", Json.string href ) ]
-                                    ++ (tipe |> Maybe.map (\t -> [ ( "type", Json.string t ) ]) |> Maybe.withDefault [])
-                          )
-                        ]
-    in
-        case maybeCrs of
-            Nothing ->
-                []
-
-            Just crs ->
-                [ ( "crs", helper crs ) ]
 
 
 encodeBbox : Maybe Bbox -> List ( String, Json.Value )
