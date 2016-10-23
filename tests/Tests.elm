@@ -10,7 +10,12 @@ import Fuzz exposing (Fuzzer)
 
 all : Test
 all =
-    concat [ geometryExamples, expectedFailures, encodeAndDecode ]
+    concat [ geometryExamples, expectedFailures, featureObjectTests, encodeAndDecode ]
+
+
+emptyObject : Json.Encode.Value
+emptyObject =
+    Json.Encode.object []
 
 
 encodeAndDecode : Test
@@ -38,9 +43,8 @@ fuzzGeoJsonObject =
 
 fuzzFeature : Fuzzer FeatureObject
 fuzzFeature =
-    Fuzz.map3 FeatureObject
+    Fuzz.map2 (\geom id -> FeatureObject geom emptyObject id)
         (Fuzz.maybe fuzzGeometry)
-        (Fuzz.constant (Json.Encode.object []))
         (Fuzz.maybe Fuzz.string)
 
 
@@ -55,7 +59,7 @@ fuzzGeometry =
                 , ( 1, Fuzz.map MultiLineString (Fuzz.list (Fuzz.list fuzzPosition)) )
                 , ( 1, Fuzz.map Polygon (Fuzz.list (Fuzz.list fuzzPosition)) )
                 , ( 1, Fuzz.map (\xs -> MultiPolygon [ xs ]) (Fuzz.list (Fuzz.list fuzzPosition)) )
-                , if depth > 3 then
+                , if depth > 2 then
                     ( 0, Fuzz.constant (Point ( 1, 2, [] )) )
                   else
                     ( 1 / depth, Fuzz.map GeometryCollection (Fuzz.list (helper (depth + 1))) )
@@ -114,6 +118,49 @@ expectedFailures =
                         """{"type": "Point", "coordinates": [1]}"""
                 in
                     decodeString decoder json |> expectErr
+        ]
+
+
+featureObjectTests : Test
+featureObjectTests =
+    describe "feature objects"
+        [ test "No properties fails" <|
+            \() ->
+                let
+                    json =
+                        """{"type": "Feature", "geometry": null}"""
+                in
+                    decodeString decoder json |> expectErr
+        , test "id can be a absent" <|
+            \() ->
+                let
+                    json =
+                        """{"type": "Feature", "geometry": null, "properties": {}}"""
+
+                    expected =
+                        Ok ( Feature { geometry = Nothing, properties = emptyObject, id = Nothing }, Nothing )
+                in
+                    decodeString decoder json |> Expect.equal expected
+        , test "id can be a string" <|
+            \() ->
+                let
+                    json =
+                        """{"type": "Feature", "geometry": null, "properties": {}, "id": "foo"}"""
+
+                    expected =
+                        Ok ( Feature { geometry = Nothing, properties = emptyObject, id = Just "foo" }, Nothing )
+                in
+                    decodeString decoder json |> Expect.equal expected
+        , test "id can be an int" <|
+            \() ->
+                let
+                    json =
+                        """{"type": "Feature", "geometry": null, "properties": {}, "id": 42}"""
+
+                    expected =
+                        Ok ( Feature { geometry = Nothing, properties = emptyObject, id = Just "42" }, Nothing )
+                in
+                    decodeString decoder json |> Expect.equal expected
         ]
 
 
@@ -364,5 +411,36 @@ geometryExamples =
                         MultiPolygon
                             [ [ [ ( 180, 40, [] ), ( 180, 50, [] ), ( 170, 50, [] ), ( 170, 40, [] ), ( 180, 40, [] ) ] ], [ [ ( -170, 40, [] ), ( -170, 50, [] ), ( -180, 50, [] ), ( -180, 40, [] ), ( -170, 40, [] ) ] ] ]
                     }
+                , test "bounding box, section 5" <|
+                    \_ ->
+                        decodeString decoder
+                            """
+                    {
+                        "type": "Feature",
+                        "bbox": [-10.0, -10.0, 10.0, 10.0],
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [
+                                [
+                                    [-10.0, -10.0],
+                                    [10.0, -10.0],
+                                    [10.0, 10.0],
+                                    [-10.0, -10.0]
+                                ]
+                            ]
+                        },
+                        "properties": {}
+                    }
+                    """
+                            |> Expect.equal
+                                (Ok
+                                    ( Feature
+                                        { geometry = Just (Polygon [ [ ( -10, -10, [] ), ( 10, -10, [] ), ( 10, 10, [] ), ( -10, -10, [] ) ] ])
+                                        , properties = emptyObject
+                                        , id = Nothing
+                                        }
+                                    , Just [ -10, -10, 10, 10 ]
+                                    )
+                                )
                 ]
             ]

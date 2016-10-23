@@ -1,7 +1,7 @@
 {
     "version": "1.0.0",
-    "summary": "helpful summary of your project, less than 80 characters",
-    "repository": "https://github.com/user/project.git",
+    "summary": "Decode GeoJSON (RFC 7946) into an Elm data structure",
+    "repository": "https://github.com/mgold/elm-geojson.git",
     "license": "BSD3",
     "source-directories": [
         "src"
