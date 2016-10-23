@@ -1,19 +1,20 @@
 module GeoJson exposing (Bbox, FeatureObject, GeoJson, GeoJsonObject(..), Geometry(..), Position, decoder, encode)
 
-{-| Decode GeoJson into an Elm data structure where you can operate on it
-further.
+{-| Decode [GeoJson](https://tools.ietf.org/html/rfc7946) into an Elm data
+structure where you can operate on it further. Most of this module defines types
+that collectively define that data structure.
 
 After using `GeoJson.decoder` you can either traverse the data structure
 directly (recommended if you're working with 2D positions and not using
 properties) or use `Json.Decode.andThen` to transform it into a more convenient
-representation (recommended if you find yourself with a lot of Maybes or
-impossible cases using the first approach). Also, GeoJSON objects may contain
-nonstandard top-level fields; you can run multiple decoders using
-`Json.Decode.object2` the way you'd use `map2`.
+representation specific to your use case (recommended if you find yourself with
+a lot of Maybes or impossible cases using the first approach). Also, GeoJSON
+objects may contain nonstandard top-level fields; you can run multiple decoders
+using `Json.Decode.object2` the way you'd use `map2`.
 
 An `encode` function is also provided, mostly for completeness and testing.
 Neither encoding nor decoding attempt to enforce minimum array lengths
-(excluding positions themselves).
+(excluding positions, whose minimum length is enforced by their type).
 
 # Decoder
 @docs decoder
@@ -46,10 +47,12 @@ type alias GeoJson =
 
 {-| A GeoJsonObject contains the primary data, and is either a `Geometry`, a
 `FeatureObject`, or a list of `FeatureObjects`.
+
+Note that the tag for `FeatureObject` is just `Feature`, to avoid a name
+collision.
 -}
 type GeoJsonObject
     = Geometry Geometry
-      -- Feature not FeatureObject to avoid name collision
     | Feature FeatureObject
     | FeatureCollection (List FeatureObject)
 
@@ -58,8 +61,8 @@ type GeoJsonObject
 allowed to have `null` instead of actual geometry, which is represented as
 `Nothing`. The `properties` may be any JSON object but no attempt is made to
 inspect it. The `id` is an optional "commonly used identifier". It is permitted
-to be either a string or a number; if the latter this implementation converts it
-to a string.
+by the RFC to be either a string or a number; if the latter this implementation
+converts it to a string.
 -}
 type alias FeatureObject =
     { geometry : Maybe Geometry
@@ -68,9 +71,9 @@ type alias FeatureObject =
     }
 
 
-{-| At last, the heart of GeoJSON: geomtry objects. The union tags reflect the
+{-| The heart of GeoJSON: geometry objects. The union tags reflect the
 `type` field of the JSON, and carries the value of the `coordinates` field (or
-`geometries` for `GeometryCollection`.
+`geometries` for `GeometryCollection`).
 
 The specification imposes minimum lengths for some of the arrays (lists in Elm).
 This representation does not express those guarantees, on the theory that you
@@ -93,10 +96,8 @@ elements. This tuple allows the compiler to provide a similar guarantee, so that
 one avoids Maybes when working with a 2D dataset.
 
 RFC 7946 suggests that positions not contain more than three elements, but this
-library accepts them. Also, according to the RFC:
-
-> The first two elements are longitude and latitude, or easting and northing,
-precisely in that order and using decimal numbers.
+library accepts them. The RFC also states that "[t]he first two elements are
+longitude and latitude, or easting and northing, precisely in that order".
 -}
 type alias Position =
     ( Float, Float, List Float )
@@ -200,7 +201,7 @@ decodePosition =
             )
 
 
-{-| encode GeoJSON into Elm. This is mostly for completeness and roundtrip
+{-| Encode GeoJSON into Elm. This is mostly for completeness and roundtrip
 testing.
 -}
 encode : GeoJson -> Json.Value
