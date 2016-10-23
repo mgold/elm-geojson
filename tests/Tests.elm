@@ -15,7 +15,7 @@ all =
 
 encodeAndDecode : Test
 encodeAndDecode =
-    fuzzWith { runs = 50 } fuzzGeoJson "encoding and decoding does not change the GeoJson" <|
+    fuzzWith { runs = 30 } fuzzGeoJson "encoding and decoding does not change the GeoJson" <|
         \geojson ->
             GeoJson.encode geojson |> Json.Decode.decodeValue decoder |> Expect.equal (Ok geojson)
 
@@ -126,38 +126,39 @@ geometryExamples =
                     decodeString decoder json
                         |> Expect.equal (Ok ( Geometry expected, Nothing ))
     in
-        describe "Geometry Examples from Appendix A of the specification"
-            [ geomTest "Point"
-                { json =
-                    """{ "type": "Point", "coordinates": [100.0, 0.0] }"""
-                , expected =
-                    Point ( 100, 0, [] )
-                }
-            , geomTest "LineString"
-                { json =
-                    """
+        describe "Geometry Examples"
+            [ describe "from Appendix A of the 2008 specification"
+                [ geomTest "Point"
+                    { json =
+                        """{ "type": "Point", "coordinates": [100.0, 0.0] }"""
+                    , expected =
+                        Point ( 100, 0, [] )
+                    }
+                , geomTest "LineString"
+                    { json =
+                        """
                        { "type": "LineString",
                         "coordinates": [ [100.0, 0.0], [101.0, 1.0] ]
                        }
                    """
-                , expected =
-                    LineString [ ( 100, 0, [] ), ( 101, 1, [] ) ]
-                }
-            , geomTest "Polygon"
-                { json =
-                    """
+                    , expected =
+                        LineString [ ( 100, 0, [] ), ( 101, 1, [] ) ]
+                    }
+                , geomTest "Polygon"
+                    { json =
+                        """
                     { "type": "Polygon",
                       "coordinates": [
                          [ [100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0] ]
                        ]
                     }
                    """
-                , expected =
-                    Polygon [ [ ( 100, 0, [] ), ( 101, 0, [] ), ( 101, 1, [] ), ( 100, 1, [] ), ( 100, 0, [] ) ] ]
-                }
-            , geomTest "Polygon with holes"
-                { json =
-                    """
+                    , expected =
+                        Polygon [ [ ( 100, 0, [] ), ( 101, 0, [] ), ( 101, 1, [] ), ( 100, 1, [] ), ( 100, 0, [] ) ] ]
+                    }
+                , geomTest "Polygon with holes"
+                    { json =
+                        """
                     { "type": "Polygon",
                       "coordinates": [
                          [ [100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0] ],
@@ -165,26 +166,26 @@ geometryExamples =
                          ]
                       }
                     """
-                , expected =
-                    Polygon
-                        [ [ ( 100, 0, [] ), ( 101, 0, [] ), ( 101, 1, [] ), ( 100, 1, [] ), ( 100, 0, [] ) ]
-                        , [ ( 100.2, 0.2, [] ), ( 100.8, 0.2, [] ), ( 100.8, 0.8, [] ), ( 100.2, 0.8, [] ), ( 100.2, 0.2, [] ) ]
-                        ]
-                }
-            , geomTest "MultiPoint"
-                { json =
-                    """
+                    , expected =
+                        Polygon
+                            [ [ ( 100, 0, [] ), ( 101, 0, [] ), ( 101, 1, [] ), ( 100, 1, [] ), ( 100, 0, [] ) ]
+                            , [ ( 100.2, 0.2, [] ), ( 100.8, 0.2, [] ), ( 100.8, 0.8, [] ), ( 100.2, 0.8, [] ), ( 100.2, 0.2, [] ) ]
+                            ]
+                    }
+                , geomTest "MultiPoint"
+                    { json =
+                        """
                     { "type": "MultiPoint",
                       "coordinates": [ [100.0, 0.0], [101.0, 1.0] ]
                     }
                     """
-                , expected =
-                    MultiPoint
-                        [ ( 100, 0, [] ), ( 101, 1, [] ) ]
-                }
-            , geomTest "MultiLineString"
-                { json =
-                    """
+                    , expected =
+                        MultiPoint
+                            [ ( 100, 0, [] ), ( 101, 1, [] ) ]
+                    }
+                , geomTest "MultiLineString"
+                    { json =
+                        """
                         { "type": "MultiLineString",
                           "coordinates": [
                             [ [100.0, 0.0], [101.0, 1.0] ],
@@ -192,15 +193,15 @@ geometryExamples =
                           ]
                         }
                     """
-                , expected =
-                    MultiLineString
-                        [ [ ( 100, 0, [] ), ( 101, 1, [] ) ]
-                        , [ ( 102, 2, [] ), ( 103, 3, [] ) ]
-                        ]
-                }
-            , geomTest "MultiPolygon"
-                { json =
-                    """
+                    , expected =
+                        MultiLineString
+                            [ [ ( 100, 0, [] ), ( 101, 1, [] ) ]
+                            , [ ( 102, 2, [] ), ( 103, 3, [] ) ]
+                            ]
+                    }
+                , geomTest "MultiPolygon"
+                    { json =
+                        """
                         { "type": "MultiPolygon",
                           "coordinates": [
                               [[[102.0, 2.0], [103.0, 2.0], [103.0, 3.0], [102.0, 3.0], [102.0, 2.0]]],
@@ -209,15 +210,15 @@ geometryExamples =
                               ]
                         }
                     """
-                , expected =
-                    MultiPolygon
-                        [ [ [ ( 102, 2, [] ), ( 103, 2, [] ), ( 103, 3, [] ), ( 102, 3, [] ), ( 102, 2, [] ) ] ]
-                        , [ [ ( 100, 0, [] ), ( 101, 0, [] ), ( 101, 1, [] ), ( 100, 1, [] ), ( 100, 0, [] ) ], [ ( 100.2, 0.2, [] ), ( 100.8, 0.2, [] ), ( 100.8, 0.8, [] ), ( 100.2, 0.8, [] ), ( 100.2, 0.2, [] ) ] ]
-                        ]
-                }
-            , geomTest "GeometryCollection"
-                { json =
-                    """
+                    , expected =
+                        MultiPolygon
+                            [ [ [ ( 102, 2, [] ), ( 103, 2, [] ), ( 103, 3, [] ), ( 102, 3, [] ), ( 102, 2, [] ) ] ]
+                            , [ [ ( 100, 0, [] ), ( 101, 0, [] ), ( 101, 1, [] ), ( 100, 1, [] ), ( 100, 0, [] ) ], [ ( 100.2, 0.2, [] ), ( 100.8, 0.2, [] ), ( 100.8, 0.8, [] ), ( 100.2, 0.8, [] ), ( 100.2, 0.2, [] ) ] ]
+                            ]
+                    }
+                , geomTest "GeometryCollection"
+                    { json =
+                        """
                         { "type": "GeometryCollection",
                           "geometries": [
                             { "type": "Point",
@@ -229,10 +230,139 @@ geometryExamples =
                          ]
                       }
                     """
-                , expected =
-                    GeometryCollection
-                        [ Point ( 100, 0, [] )
-                        , LineString [ ( 101, 0, [] ), ( 102, 1, [] ) ]
-                        ]
-                }
+                    , expected =
+                        GeometryCollection
+                            [ Point ( 100, 0, [] )
+                            , LineString [ ( 101, 0, [] ), ( 102, 1, [] ) ]
+                            ]
+                    }
+                ]
+            , describe "from RFC 7946"
+                [ test "Section 1.5" <|
+                    \_ ->
+                        decodeString decoder
+                            """
+                    {
+                       "type": "FeatureCollection",
+                       "features": [{
+                           "type": "Feature",
+                           "geometry": {
+                               "type": "Point",
+                               "coordinates": [102.0, 0.5]
+                           },
+                           "properties": {
+                               "prop0": "value0"
+                           }
+                       }, {
+                           "type": "Feature",
+                           "geometry": {
+                               "type": "LineString",
+                               "coordinates": [
+                                   [102.0, 0.0],
+                                   [103.0, 1.0],
+                                   [104.0, 0.0],
+                                   [105.0, 1.0]
+                               ]
+                           },
+                           "properties": {
+                               "prop0": "value0",
+                               "prop1": 0.0
+                           }
+                       }, {
+                           "type": "Feature",
+                           "geometry": {
+                               "type": "Polygon",
+                               "coordinates": [
+                                   [
+                                       [100.0, 0.0],
+                                       [101.0, 0.0],
+                                       [101.0, 1.0],
+                                       [100.0, 1.0],
+                                       [100.0, 0.0]
+                                   ]
+                               ]
+                           },
+                           "properties": {
+                               "prop0": "value0",
+                               "prop1": {
+                                   "this": "that"
+                               }
+                           }
+                       }]
+                   }
+                   """
+                            |> Expect.equal
+                                (Ok
+                                    ( FeatureCollection
+                                        ([ { geometry = Just (Point ( 102, 0.5, [] ))
+                                           , properties = Json.Encode.object [ ( "prop0", Json.Encode.string "value0" ) ]
+                                           , id = Nothing
+                                           }
+                                         , { geometry = Just (LineString [ ( 102, 0, [] ), ( 103, 1, [] ), ( 104, 0, [] ), ( 105, 1, [] ) ])
+                                           , properties =
+                                                Json.Encode.object
+                                                    [ ( "prop0", Json.Encode.string "value0" ), ( "prop1", Json.Encode.int 0 ) ]
+                                           , id = Nothing
+                                           }
+                                         , { geometry =
+                                                Just
+                                                    (Polygon
+                                                        [ [ ( 100, 0, [] ), ( 101, 0, [] ), ( 101, 1, [] ), ( 100, 1, [] ), ( 100, 0, [] ) ] ]
+                                                    )
+                                           , properties =
+                                                Json.Encode.object
+                                                    [ ( "prop0", Json.Encode.string "value0" )
+                                                    , ( "prop1"
+                                                      , Json.Encode.object [ ( "this", Json.Encode.string "that" ) ]
+                                                      )
+                                                    ]
+                                           , id = Nothing
+                                           }
+                                         ]
+                                        )
+                                    , Nothing
+                                    )
+                                )
+                , geomTest "Antimeridian cutting 1"
+                    { json =
+                        """
+                                    {
+                                        "type": "MultiLineString",
+                                        "coordinates": [
+                                            [
+                                                [170.0, 45.0], [180.0, 45.0]
+                                            ], [
+                                                [-180.0, 45.0], [-170.0, 45.0]
+                                            ]
+                                        ]
+                                    }
+                                    """
+                    , expected = MultiLineString [ [ ( 170, 45, [] ), ( 180, 45, [] ) ], [ ( -180, 45, [] ), ( -170, 45, [] ) ] ]
+                    }
+                , geomTest "Antimeridian cutting 2"
+                    { json =
+                        """
+                        {
+                            "type": "MultiPolygon",
+                            "coordinates": [
+                                [
+                                    [
+                                        [180.0, 40.0], [180.0, 50.0], [170.0, 50.0],
+                                        [170.0, 40.0], [180.0, 40.0]
+                                    ]
+                                ],
+                                [
+                                    [
+                                        [-170.0, 40.0], [-170.0, 50.0], [-180.0, 50.0],
+                                        [-180.0, 40.0], [-170.0, 40.0]
+                                    ]
+                                ]
+                            ]
+                        }
+                                    """
+                    , expected =
+                        MultiPolygon
+                            [ [ [ ( 180, 40, [] ), ( 180, 50, [] ), ( 170, 50, [] ), ( 170, 40, [] ), ( 180, 40, [] ) ] ], [ [ ( -170, 40, [] ), ( -170, 50, [] ), ( -180, 50, [] ), ( -180, 40, [] ), ( -170, 40, [] ) ] ] ]
+                    }
+                ]
             ]
