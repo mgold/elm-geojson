@@ -56,10 +56,10 @@ type GeoJsonObject
 
 {-| A `FeatureObject` represents a geographic feature. The `geometry` field is
 allowed to have `null` instead of actual geometry, which is represented as
-`Nothing`. The `properties` may be any JSON object or `null` but no attempt
-is made to inspect them. The `id` is an optional "commonly used identifier",
-and has been taken to be a string even though the spec does not say so
-explicitly.
+`Nothing`. The `properties` may be any JSON object but no attempt is made to
+inspect it. The `id` is an optional "commonly used identifier". It is permitted
+to be either a string or a number; if the latter this implementation converts it
+to a string.
 -}
 type alias FeatureObject =
     { geometry : Maybe Geometry
@@ -91,12 +91,19 @@ type Geometry
 represents positions as arrays of numbers that must contain at least two
 elements. This tuple allows the compiler to provide a similar guarantee, so that
 one avoids Maybes when working with a 2D dataset.
+
+RFC 7946 suggests that positions not contain more than three elements, but this
+library accepts them. Also, according to the RFC:
+
+> The first two elements are longitude and latitude, or easting and northing,
+precisely in that order and using decimal numbers.
 -}
 type alias Position =
     ( Float, Float, List Float )
 
 
-{-| Decode GeoJSON into Elm.
+{-| Decode GeoJSON into Elm. The decoded value is expressed in the types defined
+by this module.
 -}
 decoder : Decoder GeoJson
 decoder =
@@ -132,7 +139,7 @@ decodeFeature =
                 ]
         )
         ("properties" := D.value)
-        (D.maybe ("id" := D.string))
+        (D.maybe ("id" := D.oneOf [ D.string, D.map toString D.int ]))
 
 
 decodeGeometry : Decoder Geometry
@@ -193,7 +200,8 @@ decodePosition =
             )
 
 
-{-| encode GeoJSON into Elm.
+{-| encode GeoJSON into Elm. This is mostly for completeness and roundtrip
+testing.
 -}
 encode : GeoJson -> Json.Value
 encode ( geojson, bbox ) =
