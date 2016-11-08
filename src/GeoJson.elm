@@ -8,9 +8,7 @@ After using `GeoJson.decoder` you can either traverse the data structure
 directly (recommended if you're working with 2D positions and not using
 properties) or use `Json.Decode.andThen` to transform it into a more convenient
 representation specific to your use case (recommended if you find yourself with
-a lot of Maybes or impossible cases using the first approach). Also, GeoJSON
-objects may contain nonstandard top-level fields; you can run multiple decoders
-using `Json.Decode.object2` the way you'd use `map2`.
+a lot of Maybes or impossible cases using the first approach).
 
 An `encode` function is also provided, mostly for completeness and testing.
 Neither encoding nor decoding attempt to enforce minimum array lengths
@@ -28,7 +26,7 @@ All union types are fully exposed so you can inspect them as necessary.
 -}
 
 import Json.Encode as Json
-import Json.Decode as D exposing (Decoder, (:=))
+import Json.Decode as D exposing (Decoder)
 
 
 {-| A Bounding Box is represented as a simple list of floats. No attempt is made
@@ -108,9 +106,9 @@ by this module.
 -}
 decoder : Decoder GeoJson
 decoder =
-    D.object2 (,)
-        (("type" := D.string) `D.andThen` decodeGeoJson)
-        (D.maybe ("bbox" := decodeBbox))
+    D.map2 (,)
+        (D.field "type" D.string |> D.andThen decodeGeoJson)
+        (D.maybe (D.field "bbox" decodeBbox))
 
 
 decodeGeoJson : String -> Decoder GeoJsonObject
@@ -122,25 +120,25 @@ decodeGeoJson tipe =
                     D.map Feature decodeFeature
 
                 "FeatureCollection" ->
-                    D.map FeatureCollection ("features" := (D.list decodeFeature))
+                    D.map FeatureCollection (D.field "features" (D.list decodeFeature))
 
                 _ ->
                     D.map Geometry decodeGeometry
     in
-        ("type" := D.string) `D.andThen` helper
+        (D.field "type" D.string) |> D.andThen helper
 
 
 decodeFeature : Decoder FeatureObject
 decodeFeature =
-    D.object3 FeatureObject
-        ("geometry"
-            := D.oneOf
+    D.map3 FeatureObject
+        (D.field "geometry" <|
+            D.oneOf
                 [ D.null Nothing
                 , decodeGeometry |> D.map Just
                 ]
         )
-        ("properties" := D.value)
-        (D.maybe ("id" := D.oneOf [ D.string, D.map toString D.int ]))
+        (D.field "properties" D.value)
+        (D.maybe (D.field "id" <| D.oneOf [ D.string, D.map toString D.int ]))
 
 
 decodeGeometry : Decoder Geometry
@@ -149,37 +147,37 @@ decodeGeometry =
         helper tipe =
             case tipe of
                 "Point" ->
-                    ("coordinates" := decodePosition)
+                    (D.field "coordinates" decodePosition)
                         |> D.map Point
 
                 "MultiPoint" ->
-                    ("coordinates" := D.list decodePosition)
+                    (D.field "coordinates" <| D.list decodePosition)
                         |> D.map MultiPoint
 
                 "LineString" ->
-                    ("coordinates" := D.list decodePosition)
+                    (D.field "coordinates" <| D.list decodePosition)
                         |> D.map LineString
 
                 "MultiLineString" ->
-                    ("coordinates" := D.list (D.list decodePosition))
+                    (D.field "coordinates" <| D.list <| D.list decodePosition)
                         |> D.map MultiLineString
 
                 "Polygon" ->
-                    ("coordinates" := D.list (D.list decodePosition))
+                    (D.field "coordinates" <| D.list <| D.list decodePosition)
                         |> D.map Polygon
 
                 "MultiPolygon" ->
-                    ("coordinates" := D.list (D.list (D.list decodePosition)))
+                    (D.field "coordinates" <| D.list <| D.list <| D.list decodePosition)
                         |> D.map MultiPolygon
 
                 "GeometryCollection" ->
-                    ("geometries" := D.list decodeGeometry)
+                    (D.field "geometries" <| D.list decodeGeometry)
                         |> D.map GeometryCollection
 
                 _ ->
                     D.fail <| "Unrecognized 'type': " ++ tipe
     in
-        ("type" := D.string) `D.andThen` helper
+        (D.field "type" D.string) |> D.andThen helper
 
 
 decodeBbox : Decoder Bbox
@@ -190,7 +188,7 @@ decodeBbox =
 decodePosition : Decoder Position
 decodePosition =
     D.list D.float
-        `D.andThen`
+        |> D.andThen
             (\ps ->
                 case ps of
                     p1 :: p2 :: more ->
