@@ -8,9 +8,7 @@ After using `GeoJson.decoder` you can either traverse the data structure
 directly (recommended if you're working with 2D positions and not using
 properties) or use `Json.Decode.andThen` to transform it into a more convenient
 representation specific to your use case (recommended if you find yourself with
-a lot of Maybes or impossible cases using the first approach). Also, GeoJSON
-objects may contain nonstandard top-level fields; you can run multiple decoders
-using `Json.Decode.object2` the way you'd use `map2`.
+a lot of Maybes or impossible cases using the first approach).
 
 An `encode` function is also provided, mostly for completeness and testing.
 Neither encoding nor decoding attempt to enforce minimum array lengths
@@ -110,7 +108,8 @@ decoder : Decoder GeoJson
 decoder =
     D.map2 (,)
         ((field "type" D.string)
-            |> D.andThen decodeGeoJson)
+            |> D.andThen decodeGeoJson
+        )
         (D.maybe (field "bbox" decodeBbox))
 
 
