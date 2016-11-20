@@ -1,12 +1,14 @@
 {
-    "version": "1.0.1",
+    "version": "2.0.0",
     "summary": "Decode GeoJSON (RFC 7946) into an Elm data structure",
     "repository": "https://github.com/mgold/elm-geojson.git",
     "license": "BSD3",
     "source-directories": [
         "src"
     ],
-    "exposed-modules": ["GeoJson"],
+    "exposed-modules": [
+        "GeoJson"
+    ],
     "dependencies": {
         "elm-lang/core": "5.0.0 <= v < 6.0.0"
     },
