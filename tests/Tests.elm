@@ -60,7 +60,7 @@ fuzzGeometry =
                 , ( 1, Fuzz.map Polygon (Fuzz.list (Fuzz.list fuzzPosition)) )
                 , ( 1, Fuzz.map (\xs -> MultiPolygon [ xs ]) (Fuzz.list (Fuzz.list fuzzPosition)) )
                 , if depth > 2 then
-                    ( 0, Fuzz.constant (Point ( 1, 2, [] )) )
+                    ( 0, Fuzz.constant (Point ( 1, 2, 0 )) )
                   else
                     ( 1 / depth, Fuzz.map GeometryCollection (Fuzz.list (helper (depth + 1))) )
                 ]
@@ -70,7 +70,25 @@ fuzzGeometry =
 
 fuzzPosition : Fuzzer Position
 fuzzPosition =
-    Fuzz.map2 (\a b -> ( a, b, [] )) Fuzz.float Fuzz.float
+    Fuzz.frequencyOrCrash
+        [ ( 1, Fuzz.map2 (\a b -> ( a, b, 0 )) Fuzz.float Fuzz.float )
+        , ( 1
+          , Fuzz.map3
+                (\a b c ->
+                    let
+                        c_ =
+                            if c == 0 then
+                                1
+                            else
+                                c
+                    in
+                        ( a, b, c_ )
+                )
+                Fuzz.float
+                Fuzz.float
+                Fuzz.float
+          )
+        ]
 
 
 fuzzBbox : Fuzzer Bbox
@@ -179,7 +197,7 @@ geometryExamples =
                     { json =
                         """{ "type": "Point", "coordinates": [100.0, 0.0] }"""
                     , expected =
-                        Point ( 100, 0, [] )
+                        Point ( 100, 0, 0 )
                     }
                 , geomTest "LineString"
                     { json =
@@ -189,7 +207,7 @@ geometryExamples =
                        }
                    """
                     , expected =
-                        LineString [ ( 100, 0, [] ), ( 101, 1, [] ) ]
+                        LineString [ ( 100, 0, 0 ), ( 101, 1, 0 ) ]
                     }
                 , geomTest "Polygon"
                     { json =
@@ -201,7 +219,7 @@ geometryExamples =
                     }
                    """
                     , expected =
-                        Polygon [ [ ( 100, 0, [] ), ( 101, 0, [] ), ( 101, 1, [] ), ( 100, 1, [] ), ( 100, 0, [] ) ] ]
+                        Polygon [ [ ( 100, 0, 0 ), ( 101, 0, 0 ), ( 101, 1, 0 ), ( 100, 1, 0 ), ( 100, 0, 0 ) ] ]
                     }
                 , geomTest "Polygon with holes"
                     { json =
@@ -215,8 +233,8 @@ geometryExamples =
                     """
                     , expected =
                         Polygon
-                            [ [ ( 100, 0, [] ), ( 101, 0, [] ), ( 101, 1, [] ), ( 100, 1, [] ), ( 100, 0, [] ) ]
-                            , [ ( 100.2, 0.2, [] ), ( 100.8, 0.2, [] ), ( 100.8, 0.8, [] ), ( 100.2, 0.8, [] ), ( 100.2, 0.2, [] ) ]
+                            [ [ ( 100, 0, 0 ), ( 101, 0, 0 ), ( 101, 1, 0 ), ( 100, 1, 0 ), ( 100, 0, 0 ) ]
+                            , [ ( 100.2, 0.2, 0 ), ( 100.8, 0.2, 0 ), ( 100.8, 0.8, 0 ), ( 100.2, 0.8, 0 ), ( 100.2, 0.2, 0 ) ]
                             ]
                     }
                 , geomTest "MultiPoint"
@@ -228,7 +246,7 @@ geometryExamples =
                     """
                     , expected =
                         MultiPoint
-                            [ ( 100, 0, [] ), ( 101, 1, [] ) ]
+                            [ ( 100, 0, 0 ), ( 101, 1, 0 ) ]
                     }
                 , geomTest "MultiLineString"
                     { json =
@@ -242,8 +260,8 @@ geometryExamples =
                     """
                     , expected =
                         MultiLineString
-                            [ [ ( 100, 0, [] ), ( 101, 1, [] ) ]
-                            , [ ( 102, 2, [] ), ( 103, 3, [] ) ]
+                            [ [ ( 100, 0, 0 ), ( 101, 1, 0 ) ]
+                            , [ ( 102, 2, 0 ), ( 103, 3, 0 ) ]
                             ]
                     }
                 , geomTest "MultiPolygon"
@@ -259,8 +277,8 @@ geometryExamples =
                     """
                     , expected =
                         MultiPolygon
-                            [ [ [ ( 102, 2, [] ), ( 103, 2, [] ), ( 103, 3, [] ), ( 102, 3, [] ), ( 102, 2, [] ) ] ]
-                            , [ [ ( 100, 0, [] ), ( 101, 0, [] ), ( 101, 1, [] ), ( 100, 1, [] ), ( 100, 0, [] ) ], [ ( 100.2, 0.2, [] ), ( 100.8, 0.2, [] ), ( 100.8, 0.8, [] ), ( 100.2, 0.8, [] ), ( 100.2, 0.2, [] ) ] ]
+                            [ [ [ ( 102, 2, 0 ), ( 103, 2, 0 ), ( 103, 3, 0 ), ( 102, 3, 0 ), ( 102, 2, 0 ) ] ]
+                            , [ [ ( 100, 0, 0 ), ( 101, 0, 0 ), ( 101, 1, 0 ), ( 100, 1, 0 ), ( 100, 0, 0 ) ], [ ( 100.2, 0.2, 0 ), ( 100.8, 0.2, 0 ), ( 100.8, 0.8, 0 ), ( 100.2, 0.8, 0 ), ( 100.2, 0.2, 0 ) ] ]
                             ]
                     }
                 , geomTest "GeometryCollection"
@@ -279,8 +297,8 @@ geometryExamples =
                     """
                     , expected =
                         GeometryCollection
-                            [ Point ( 100, 0, [] )
-                            , LineString [ ( 101, 0, [] ), ( 102, 1, [] ) ]
+                            [ Point ( 100, 0, 0 )
+                            , LineString [ ( 101, 0, 0 ), ( 102, 1, 0 ) ]
                             ]
                     }
                 ]
@@ -341,11 +359,11 @@ geometryExamples =
                             |> Expect.equal
                                 (Ok
                                     ( FeatureCollection
-                                        ([ { geometry = Just (Point ( 102, 0.5, [] ))
+                                        ([ { geometry = Just (Point ( 102, 0.5, 0 ))
                                            , properties = Json.Encode.object [ ( "prop0", Json.Encode.string "value0" ) ]
                                            , id = Nothing
                                            }
-                                         , { geometry = Just (LineString [ ( 102, 0, [] ), ( 103, 1, [] ), ( 104, 0, [] ), ( 105, 1, [] ) ])
+                                         , { geometry = Just (LineString [ ( 102, 0, 0 ), ( 103, 1, 0 ), ( 104, 0, 0 ), ( 105, 1, 0 ) ])
                                            , properties =
                                                 Json.Encode.object
                                                     [ ( "prop0", Json.Encode.string "value0" ), ( "prop1", Json.Encode.int 0 ) ]
@@ -354,7 +372,7 @@ geometryExamples =
                                          , { geometry =
                                                 Just
                                                     (Polygon
-                                                        [ [ ( 100, 0, [] ), ( 101, 0, [] ), ( 101, 1, [] ), ( 100, 1, [] ), ( 100, 0, [] ) ] ]
+                                                        [ [ ( 100, 0, 0 ), ( 101, 0, 0 ), ( 101, 1, 0 ), ( 100, 1, 0 ), ( 100, 0, 0 ) ] ]
                                                     )
                                            , properties =
                                                 Json.Encode.object
@@ -384,7 +402,7 @@ geometryExamples =
                                         ]
                                     }
                                     """
-                    , expected = MultiLineString [ [ ( 170, 45, [] ), ( 180, 45, [] ) ], [ ( -180, 45, [] ), ( -170, 45, [] ) ] ]
+                    , expected = MultiLineString [ [ ( 170, 45, 0 ), ( 180, 45, 0 ) ], [ ( -180, 45, 0 ), ( -170, 45, 0 ) ] ]
                     }
                 , geomTest "Antimeridian cutting 2"
                     { json =
@@ -409,7 +427,7 @@ geometryExamples =
                                     """
                     , expected =
                         MultiPolygon
-                            [ [ [ ( 180, 40, [] ), ( 180, 50, [] ), ( 170, 50, [] ), ( 170, 40, [] ), ( 180, 40, [] ) ] ], [ [ ( -170, 40, [] ), ( -170, 50, [] ), ( -180, 50, [] ), ( -180, 40, [] ), ( -170, 40, [] ) ] ] ]
+                            [ [ [ ( 180, 40, 0 ), ( 180, 50, 0 ), ( 170, 50, 0 ), ( 170, 40, 0 ), ( 180, 40, 0 ) ] ], [ [ ( -170, 40, 0 ), ( -170, 50, 0 ), ( -180, 50, 0 ), ( -180, 40, 0 ), ( -170, 40, 0 ) ] ] ]
                     }
                 , test "bounding box, section 5" <|
                     \_ ->
@@ -435,7 +453,7 @@ geometryExamples =
                             |> Expect.equal
                                 (Ok
                                     ( Feature
-                                        { geometry = Just (Polygon [ [ ( -10, -10, [] ), ( 10, -10, [] ), ( 10, 10, [] ), ( -10, -10, [] ) ] ])
+                                        { geometry = Just (Polygon [ [ ( -10, -10, 0 ), ( 10, -10, 0 ), ( 10, 10, 0 ), ( -10, -10, 0 ) ] ])
                                         , properties = emptyObject
                                         , id = Nothing
                                         }

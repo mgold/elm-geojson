@@ -5,14 +5,12 @@ structure where you can operate on it further. Most of this module defines types
 that collectively define that data structure.
 
 After using `GeoJson.decoder` you can either traverse the data structure
-directly (recommended if you're working with 2D positions and not using
-properties) or use `Json.Decode.andThen` to transform it into a more convenient
-representation specific to your use case (recommended if you find yourself with
-a lot of Maybes or impossible cases using the first approach).
+directly  or use `Json.Decode.andThen` to transform it into a more convenient
+representation specific to your use case. It is recommended that you try the
+first approach first, and switch to the second if you encounter difficulty.
 
 An `encode` function is also provided, mostly for completeness and testing.
-Neither encoding nor decoding attempt to enforce minimum array lengths
-(excluding positions, whose minimum length is enforced by their type).
+Neither encoding nor decoding attempt to enforce minimum array lengths.
 
 # Decoder
 @docs decoder
@@ -88,17 +86,16 @@ type Geometry
     | GeometryCollection (List Geometry)
 
 
-{-| A `Position` is the fundamental geometry construct. The specification
-represents positions as arrays of numbers that must contain at least two
-elements. This tuple allows the compiler to provide a similar guarantee, so that
-one avoids Maybes when working with a 2D dataset.
+{-| A `Position` is the fundamental geometry construct, and are represented in
+JSON as an array of numbers. RFC 7946 states that "[t]he first two elements are
+longitude and latitude, or easting and northing, precisely in that order". The
+third element is the altitude. If omitted in the JSON, it will be set to zero.
 
-RFC 7946 suggests that positions not contain more than three elements, but this
-library accepts them. The RFC also states that "[t]he first two elements are
-longitude and latitude, or easting and northing, precisely in that order".
+As recommended by the RFC, position arrays with more than three elements are
+rejected.
 -}
 type alias Position =
-    ( Float, Float, List Float )
+    ( Float, Float, Float )
 
 
 {-| Decode GeoJSON into Elm. The decoded value is expressed in the types defined
@@ -192,20 +189,34 @@ decodeBbox =
 
 decodePosition : Decoder Position
 decodePosition =
-    D.list D.float
-        |> D.andThen
-            (\ps ->
-                case ps of
-                    p1 :: p2 :: more ->
-                        D.succeed ( p1, p2, more )
+    let
+        errorString adj =
+            "Array has too " ++ adj ++ " numbers to make a position"
 
-                    _ ->
-                        D.fail "Array has too few numbers to make a position"
-            )
+        listToTuple ps =
+            case ps of
+                [] ->
+                    D.fail (errorString "few")
+
+                [ _ ] ->
+                    D.fail (errorString "few")
+
+                [ p1, p2 ] ->
+                    D.succeed ( p1, p2, 0 )
+
+                [ p1, p2, p3 ] ->
+                    D.succeed ( p1, p2, p3 )
+
+                _ ->
+                    D.fail (errorString "many")
+    in
+        D.list D.float |> D.andThen listToTuple
 
 
 {-| Encode GeoJSON into Elm. This is mostly for completeness and roundtrip
 testing.
+
+Positions with an altitude of zero will be encoded as two-element arrays.
 -}
 encode : GeoJson -> Json.Value
 encode ( geojson, bbox ) =
@@ -292,7 +303,14 @@ encodeBbox bbox =
 
 
 encodePosition : Position -> Json.Value
-encodePosition ( a, b, more ) =
-    (a :: b :: more)
-        |> List.map Json.float
-        |> Json.list
+encodePosition ( a, b, c ) =
+    let
+        coordinates =
+            if c == 0 then
+                [ a, b ]
+            else
+                [ a, b, c ]
+    in
+        coordinates
+            |> List.map Json.float
+            |> Json.list

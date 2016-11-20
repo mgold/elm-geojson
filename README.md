@@ -16,7 +16,7 @@ A library to decode (and encode) geoJson into a format that's nice to use in Elm
 into this:
 
 ```elm
-(Geometry (LineString [ ( 100, 0, [] ), ( 101, 1, [] ) ]), Just [-10, -10, 10, 10])
+(Geometry (LineString [ ( 100, 0, 0 ), ( 101, 1, 0 ) ]), Just [-10, -10, 10, 10])
 ```
 
 For more details, see the GeoJson module docs.
