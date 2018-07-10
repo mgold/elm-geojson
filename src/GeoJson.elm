@@ -5,26 +5,34 @@ structure where you can operate on it further. Most of this module defines types
 that collectively define that data structure.
 
 After using `GeoJson.decoder` you can either traverse the data structure
-directly  or use `Json.Decode.andThen` to transform it into a more convenient
+directly or use `Json.Decode.andThen` to transform it into a more convenient
 representation specific to your use case. It is recommended that you try the
 first approach first, and switch to the second if you encounter difficulty.
 
 An `encode` function is also provided, mostly for completeness and testing.
 Neither encoding nor decoding attempt to enforce minimum array lengths.
 
+
 # Decoder
+
 @docs decoder
 
+
 # Elm Representation of GeoJSON
+
 All union types are fully exposed so you can inspect them as necessary.
-@docs GeoJson, GeoJsonObject, FeatureObject, Geometry, Position,  Bbox
+
+@docs GeoJson, GeoJsonObject, FeatureObject, Geometry, Position, Bbox
+
 
 # Encoding
+
 @docs encode
+
 -}
 
-import Json.Encode as Json
 import Json.Decode as D exposing (Decoder, field)
+import Json.Encode as Json
 
 
 {-| A Bounding Box is represented as a simple list of floats. No attempt is made
@@ -46,6 +54,7 @@ type alias GeoJson =
 
 Note that the tag for `FeatureObject` is just `Feature`, to avoid a name
 collision.
+
 -}
 type GeoJsonObject
     = Geometry Geometry
@@ -75,6 +84,7 @@ The specification imposes minimum lengths for some of the arrays (lists in Elm).
 This representation does not express those guarantees, on the theory that you
 will likely be working with a valid GeoJson file rather than generating one of
 your own.
+
 -}
 type Geometry
     = Point Position
@@ -93,6 +103,7 @@ third element is the altitude. If omitted in the JSON, it will be set to zero.
 
 As recommended by the RFC, position arrays with more than three elements are
 rejected.
+
 -}
 type alias Position =
     ( Float, Float, Float )
@@ -103,8 +114,8 @@ by this module.
 -}
 decoder : Decoder GeoJson
 decoder =
-    D.map2 (,)
-        ((field "type" D.string)
+    D.map2 Tuple.pair
+        (field "type" D.string
             |> D.andThen decodeGeoJson
         )
         (D.maybe (field "bbox" decodeBbox))
@@ -113,8 +124,8 @@ decoder =
 decodeGeoJson : String -> Decoder GeoJsonObject
 decodeGeoJson tipe =
     let
-        helper tipe =
-            case tipe of
+        helper h_tipe =
+            case h_tipe of
                 "Feature" ->
                     D.map Feature decodeFeature
 
@@ -124,8 +135,8 @@ decodeGeoJson tipe =
                 _ ->
                     D.map Geometry decodeGeometry
     in
-        (field "type" D.string)
-            |> D.andThen helper
+    field "type" D.string
+        |> D.andThen helper
 
 
 decodeFeature : Decoder FeatureObject
@@ -139,7 +150,7 @@ decodeFeature =
             )
         )
         (field "properties" D.value)
-        (D.maybe (field "id" (D.oneOf [ D.string, D.map toString D.int ])))
+        (D.maybe (field "id" (D.oneOf [ D.string, D.map String.fromInt D.int ])))
 
 
 decodeGeometry : Decoder Geometry
@@ -148,38 +159,38 @@ decodeGeometry =
         helper tipe =
             case tipe of
                 "Point" ->
-                    (field "coordinates" decodePosition)
+                    field "coordinates" decodePosition
                         |> D.map Point
 
                 "MultiPoint" ->
-                    (field "coordinates" (D.list decodePosition))
+                    field "coordinates" (D.list decodePosition)
                         |> D.map MultiPoint
 
                 "LineString" ->
-                    (field "coordinates" (D.list decodePosition))
+                    field "coordinates" (D.list decodePosition)
                         |> D.map LineString
 
                 "MultiLineString" ->
-                    (field "coordinates" (D.list (D.list decodePosition)))
+                    field "coordinates" (D.list (D.list decodePosition))
                         |> D.map MultiLineString
 
                 "Polygon" ->
-                    (field "coordinates" (D.list (D.list decodePosition)))
+                    field "coordinates" (D.list (D.list decodePosition))
                         |> D.map Polygon
 
                 "MultiPolygon" ->
-                    (field "coordinates" (D.list (D.list (D.list decodePosition))))
+                    field "coordinates" (D.list (D.list (D.list decodePosition)))
                         |> D.map MultiPolygon
 
                 "GeometryCollection" ->
-                    (field "geometries" (D.list decodeGeometry))
+                    field "geometries" (D.list decodeGeometry)
                         |> D.map GeometryCollection
 
                 _ ->
                     D.fail <| "Unrecognized 'type': " ++ tipe
     in
-        (field "type" D.string)
-            |> D.andThen helper
+    field "type" D.string
+        |> D.andThen helper
 
 
 decodeBbox : Decoder Bbox
@@ -210,13 +221,14 @@ decodePosition =
                 _ ->
                     D.fail (errorString "many")
     in
-        D.list D.float |> D.andThen listToTuple
+    D.list D.float |> D.andThen listToTuple
 
 
 {-| Encode GeoJSON into Elm. This is mostly for completeness and roundtrip
 testing.
 
 Positions with an altitude of zero will be encoded as two-element arrays.
+
 -}
 encode : GeoJson -> Json.Value
 encode ( geojson, bbox ) =
@@ -231,7 +243,7 @@ encodeGeoJson geojson =
 
         FeatureCollection features ->
             [ ( "type", Json.string "FeatureCollection" )
-            , ( "features", features |> List.map (encodeFeature >> Json.object) |> Json.list )
+            , ( "features", features |> Json.list (encodeFeature >> Json.object) )
             ]
 
         Geometry geometry ->
@@ -249,11 +261,11 @@ encodeFeature { geometry, properties, id } =
                 Just theId ->
                     [ ( "id", Json.string theId ) ]
     in
-        [ ( "type", Json.string "Feature" )
-        , ( "geometry", geometry |> Maybe.map (encodeGeometry >> Json.object) |> Maybe.withDefault Json.null )
-        , ( "properties", properties )
-        ]
-            ++ encodedId
+    [ ( "type", Json.string "Feature" )
+    , ( "geometry", geometry |> Maybe.map (encodeGeometry >> Json.object) |> Maybe.withDefault Json.null )
+    , ( "properties", properties )
+    ]
+        ++ encodedId
 
 
 encodeGeometry : Geometry -> List ( String, Json.Value )
@@ -266,39 +278,45 @@ encodeGeometry geom =
 
         MultiPoint data ->
             [ ( "type", Json.string "MultiPoint" )
-            , ( "coordinates", data |> List.map encodePosition |> Json.list )
+            , ( "coordinates", data |> Json.list encodePosition )
             ]
 
         LineString data ->
             [ ( "type", Json.string "LineString" )
-            , ( "coordinates", data |> List.map encodePosition |> Json.list )
+            , ( "coordinates", data |> Json.list encodePosition )
             ]
 
         MultiLineString data ->
             [ ( "type", Json.string "MultiLineString" )
-            , ( "coordinates", data |> List.map (List.map encodePosition >> Json.list) |> Json.list )
+            , ( "coordinates"
+              , Json.list (Json.list encodePosition) data
+              )
             ]
 
         Polygon data ->
             [ ( "type", Json.string "Polygon" )
-            , ( "coordinates", data |> List.map (List.map encodePosition >> Json.list) |> Json.list )
+            , ( "coordinates"
+              , Json.list (Json.list encodePosition) data
+              )
             ]
 
         MultiPolygon data ->
             [ ( "type", Json.string "MultiPolygon" )
-            , ( "coordinates", data |> List.map (List.map (List.map encodePosition >> Json.list) >> Json.list) |> Json.list )
+            , ( "coordinates"
+              , Json.list (Json.list (Json.list encodePosition)) data
+              )
             ]
 
         GeometryCollection data ->
             [ ( "type", Json.string "GeometryCollection" )
-            , ( "geometries", data |> List.map (encodeGeometry >> Json.object) |> Json.list )
+            , ( "geometries", data |> Json.list (encodeGeometry >> Json.object) )
             ]
 
 
 encodeBbox : Maybe Bbox -> List ( String, Json.Value )
 encodeBbox bbox =
     bbox
-        |> Maybe.map (\b -> [ ( "bbox", b |> List.map Json.float |> Json.list ) ])
+        |> Maybe.map (\b -> [ ( "bbox", Json.list Json.float b ) ])
         |> Maybe.withDefault []
 
 
@@ -308,9 +326,8 @@ encodePosition ( a, b, c ) =
         coordinates =
             if c == 0 then
                 [ a, b ]
+
             else
                 [ a, b, c ]
     in
-        coordinates
-            |> List.map Json.float
-            |> Json.list
+    Json.list Json.float coordinates
