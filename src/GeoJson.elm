@@ -115,14 +115,12 @@ by this module.
 decoder : Decoder GeoJson
 decoder =
     D.map2 Tuple.pair
-        (field "type" D.string
-            |> D.andThen decodeGeoJson
-        )
+        decodeGeoJson
         (D.maybe (field "bbox" decodeBbox))
 
 
-decodeGeoJson : String -> Decoder GeoJsonObject
-decodeGeoJson tipe =
+decodeGeoJson : Decoder GeoJsonObject
+decodeGeoJson =
     let
         helper h_tipe =
             case h_tipe of

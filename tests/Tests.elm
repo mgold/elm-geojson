@@ -117,14 +117,13 @@ expectedFailures =
                         """{"type": "NotAnActualType"}"""
                 in
                 decodeString decoder json |> expectErr
-        , skip <|
-            test "No coordinates" <|
-                \() ->
-                    let
-                        json =
-                            """{"type": "Point"}"""
-                    in
-                    decodeString decoder json |> expectErr
+        , test "No coordinates" <|
+            \() ->
+                let
+                    json =
+                        """{"type": "Point"}"""
+                in
+                decodeString decoder json |> expectErr
         , test "Not enough indices in position " <|
             \() ->
                 let

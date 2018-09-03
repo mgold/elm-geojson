@@ -1,10 +1,10 @@
 # elm-geojson
 
 ```
-elm package install -y mgold/elm-geojson
+elm install mgold/elm-geojson
 ```
 
-A library to decode (and encode) geoJson into a format that's nice to use in Elm. Turn this:
+A library to decode and encode geoJson into a format that's nice to use in Elm. Turn this:
 
 ```json
 { "type": "LineString",
@@ -19,7 +19,7 @@ into this:
 (Geometry (LineString [ ( 100, 0, 0 ), ( 101, 1, 0 ) ]), Just [-10, -10, 10, 10])
 ```
 
-For more details, see the GeoJson module docs.
+For more details, see the GeoJson module docs. GeoJSON itself is defined in [RFC 7946](https://tools.ietf.org/html/rfc7946).
 
 
 ## Testing
