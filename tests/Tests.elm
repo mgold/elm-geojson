@@ -1,16 +1,11 @@
 module Tests exposing (..)
 
-import Test exposing (..)
 import Expect exposing (Expectation)
-import GeoJson exposing (GeoJson, GeoJsonObject(..), Geometry(..), FeatureObject, Position, Bbox, decoder)
+import Fuzz exposing (Fuzzer)
+import GeoJson exposing (Bbox, FeatureObject, GeoJson, GeoJsonObject(..), Geometry(..), Position, decoder)
 import Json.Decode exposing (decodeString)
 import Json.Encode
-import Fuzz exposing (Fuzzer)
-
-
-all : Test
-all =
-    concat [ geometryExamples, expectedFailures, featureObjectTests, encodeAndDecode ]
+import Test exposing (..)
 
 
 emptyObject : Json.Encode.Value
@@ -34,7 +29,7 @@ fuzzGeoJson =
 
 
 fuzzGeoJsonObject =
-    Fuzz.frequencyOrCrash
+    Fuzz.frequency
         [ ( 1, Fuzz.map FeatureCollection (Fuzz.list fuzzFeature) )
         , ( 1, Fuzz.map Feature fuzzFeature )
         , ( 7, Fuzz.map Geometry fuzzGeometry )
@@ -52,7 +47,7 @@ fuzzGeometry : Fuzzer Geometry
 fuzzGeometry =
     let
         helper depth =
-            Fuzz.frequencyOrCrash
+            Fuzz.frequency
                 [ ( 1, Fuzz.map Point fuzzPosition )
                 , ( 1, Fuzz.map MultiPoint (Fuzz.list fuzzPosition) )
                 , ( 1, Fuzz.map LineString (Fuzz.list fuzzPosition) )
@@ -61,16 +56,17 @@ fuzzGeometry =
                 , ( 1, Fuzz.map (\xs -> MultiPolygon [ xs ]) (Fuzz.list (Fuzz.list fuzzPosition)) )
                 , if depth > 2 then
                     ( 0, Fuzz.constant (Point ( 1, 2, 0 )) )
+
                   else
                     ( 1 / depth, Fuzz.map GeometryCollection (Fuzz.list (helper (depth + 1))) )
                 ]
     in
-        helper 1
+    helper 1
 
 
 fuzzPosition : Fuzzer Position
 fuzzPosition =
-    Fuzz.frequencyOrCrash
+    Fuzz.frequency
         [ ( 1, Fuzz.map2 (\a b -> ( a, b, 0 )) Fuzz.float Fuzz.float )
         , ( 1
           , Fuzz.map3
@@ -79,10 +75,11 @@ fuzzPosition =
                         c_ =
                             if c == 0 then
                                 1
+
                             else
                                 c
                     in
-                        ( a, b, c_ )
+                    ( a, b, c_ )
                 )
                 Fuzz.float
                 Fuzz.float
@@ -93,20 +90,18 @@ fuzzPosition =
 
 fuzzBbox : Fuzzer Bbox
 fuzzBbox =
-    Fuzz.tuple4
-        ( Fuzz.float
-        , Fuzz.float
-        , Fuzz.float
-        , Fuzz.float
+    Fuzz.tuple
+        ( Fuzz.tuple ( Fuzz.float, Fuzz.float )
+        , Fuzz.tuple ( Fuzz.float, Fuzz.float )
         )
-        |> Fuzz.map (\( a, b, c, d ) -> [ a, b, c, d ])
+        |> Fuzz.map (\( ( a, b ), ( c, d ) ) -> [ a, b, c, d ])
 
 
 expectErr : Result a b -> Expectation
 expectErr r =
     case r of
         Ok _ ->
-            Expect.fail <| "Expected an Err but got " ++ toString r
+            Expect.fail <| "Expected an Err but got " ++ Debug.toString r
 
         Err _ ->
             Expect.pass
@@ -121,21 +116,21 @@ expectedFailures =
                     json =
                         """{"type": "NotAnActualType"}"""
                 in
-                    decodeString decoder json |> expectErr
+                decodeString decoder json |> expectErr
         , test "No coordinates" <|
             \() ->
                 let
                     json =
                         """{"type": "Point"}"""
                 in
-                    decodeString decoder json |> expectErr
+                decodeString decoder json |> expectErr
         , test "Not enough indices in position " <|
             \() ->
                 let
                     json =
                         """{"type": "Point", "coordinates": [1]}"""
                 in
-                    decodeString decoder json |> expectErr
+                decodeString decoder json |> expectErr
         ]
 
 
@@ -148,7 +143,7 @@ featureObjectTests =
                     json =
                         """{"type": "Feature", "geometry": null}"""
                 in
-                    decodeString decoder json |> expectErr
+                decodeString decoder json |> expectErr
         , test "id can be a absent" <|
             \() ->
                 let
@@ -158,7 +153,7 @@ featureObjectTests =
                     expected =
                         Ok ( Feature { geometry = Nothing, properties = emptyObject, id = Nothing }, Nothing )
                 in
-                    decodeString decoder json |> Expect.equal expected
+                decodeString decoder json |> Expect.equal expected
         , test "id can be a string" <|
             \() ->
                 let
@@ -168,7 +163,7 @@ featureObjectTests =
                     expected =
                         Ok ( Feature { geometry = Nothing, properties = emptyObject, id = Just "foo" }, Nothing )
                 in
-                    decodeString decoder json |> Expect.equal expected
+                decodeString decoder json |> Expect.equal expected
         , test "id can be an int" <|
             \() ->
                 let
@@ -178,7 +173,7 @@ featureObjectTests =
                     expected =
                         Ok ( Feature { geometry = Nothing, properties = emptyObject, id = Just "42" }, Nothing )
                 in
-                    decodeString decoder json |> Expect.equal expected
+                decodeString decoder json |> Expect.equal expected
         ]
 
 
@@ -191,39 +186,39 @@ geometryExamples =
                     decodeString decoder json
                         |> Expect.equal (Ok ( Geometry expected, Nothing ))
     in
-        describe "Geometry Examples"
-            [ describe "from Appendix A of the 2008 specification"
-                [ geomTest "Point"
-                    { json =
-                        """{ "type": "Point", "coordinates": [100.0, 0.0] }"""
-                    , expected =
-                        Point ( 100, 0, 0 )
-                    }
-                , geomTest "LineString"
-                    { json =
-                        """
+    describe "Geometry Examples"
+        [ describe "from Appendix A of the 2008 specification"
+            [ geomTest "Point"
+                { json =
+                    """{ "type": "Point", "coordinates": [100.0, 0.0] }"""
+                , expected =
+                    Point ( 100, 0, 0 )
+                }
+            , geomTest "LineString"
+                { json =
+                    """
                        { "type": "LineString",
                         "coordinates": [ [100.0, 0.0], [101.0, 1.0] ]
                        }
                    """
-                    , expected =
-                        LineString [ ( 100, 0, 0 ), ( 101, 1, 0 ) ]
-                    }
-                , geomTest "Polygon"
-                    { json =
-                        """
+                , expected =
+                    LineString [ ( 100, 0, 0 ), ( 101, 1, 0 ) ]
+                }
+            , geomTest "Polygon"
+                { json =
+                    """
                     { "type": "Polygon",
                       "coordinates": [
                          [ [100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0] ]
                        ]
                     }
                    """
-                    , expected =
-                        Polygon [ [ ( 100, 0, 0 ), ( 101, 0, 0 ), ( 101, 1, 0 ), ( 100, 1, 0 ), ( 100, 0, 0 ) ] ]
-                    }
-                , geomTest "Polygon with holes"
-                    { json =
-                        """
+                , expected =
+                    Polygon [ [ ( 100, 0, 0 ), ( 101, 0, 0 ), ( 101, 1, 0 ), ( 100, 1, 0 ), ( 100, 0, 0 ) ] ]
+                }
+            , geomTest "Polygon with holes"
+                { json =
+                    """
                     { "type": "Polygon",
                       "coordinates": [
                          [ [100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0] ],
@@ -231,26 +226,26 @@ geometryExamples =
                          ]
                       }
                     """
-                    , expected =
-                        Polygon
-                            [ [ ( 100, 0, 0 ), ( 101, 0, 0 ), ( 101, 1, 0 ), ( 100, 1, 0 ), ( 100, 0, 0 ) ]
-                            , [ ( 100.2, 0.2, 0 ), ( 100.8, 0.2, 0 ), ( 100.8, 0.8, 0 ), ( 100.2, 0.8, 0 ), ( 100.2, 0.2, 0 ) ]
-                            ]
-                    }
-                , geomTest "MultiPoint"
-                    { json =
-                        """
+                , expected =
+                    Polygon
+                        [ [ ( 100, 0, 0 ), ( 101, 0, 0 ), ( 101, 1, 0 ), ( 100, 1, 0 ), ( 100, 0, 0 ) ]
+                        , [ ( 100.2, 0.2, 0 ), ( 100.8, 0.2, 0 ), ( 100.8, 0.8, 0 ), ( 100.2, 0.8, 0 ), ( 100.2, 0.2, 0 ) ]
+                        ]
+                }
+            , geomTest "MultiPoint"
+                { json =
+                    """
                     { "type": "MultiPoint",
                       "coordinates": [ [100.0, 0.0], [101.0, 1.0] ]
                     }
                     """
-                    , expected =
-                        MultiPoint
-                            [ ( 100, 0, 0 ), ( 101, 1, 0 ) ]
-                    }
-                , geomTest "MultiLineString"
-                    { json =
-                        """
+                , expected =
+                    MultiPoint
+                        [ ( 100, 0, 0 ), ( 101, 1, 0 ) ]
+                }
+            , geomTest "MultiLineString"
+                { json =
+                    """
                         { "type": "MultiLineString",
                           "coordinates": [
                             [ [100.0, 0.0], [101.0, 1.0] ],
@@ -258,15 +253,15 @@ geometryExamples =
                           ]
                         }
                     """
-                    , expected =
-                        MultiLineString
-                            [ [ ( 100, 0, 0 ), ( 101, 1, 0 ) ]
-                            , [ ( 102, 2, 0 ), ( 103, 3, 0 ) ]
-                            ]
-                    }
-                , geomTest "MultiPolygon"
-                    { json =
-                        """
+                , expected =
+                    MultiLineString
+                        [ [ ( 100, 0, 0 ), ( 101, 1, 0 ) ]
+                        , [ ( 102, 2, 0 ), ( 103, 3, 0 ) ]
+                        ]
+                }
+            , geomTest "MultiPolygon"
+                { json =
+                    """
                         { "type": "MultiPolygon",
                           "coordinates": [
                               [[[102.0, 2.0], [103.0, 2.0], [103.0, 3.0], [102.0, 3.0], [102.0, 2.0]]],
@@ -275,15 +270,15 @@ geometryExamples =
                               ]
                         }
                     """
-                    , expected =
-                        MultiPolygon
-                            [ [ [ ( 102, 2, 0 ), ( 103, 2, 0 ), ( 103, 3, 0 ), ( 102, 3, 0 ), ( 102, 2, 0 ) ] ]
-                            , [ [ ( 100, 0, 0 ), ( 101, 0, 0 ), ( 101, 1, 0 ), ( 100, 1, 0 ), ( 100, 0, 0 ) ], [ ( 100.2, 0.2, 0 ), ( 100.8, 0.2, 0 ), ( 100.8, 0.8, 0 ), ( 100.2, 0.8, 0 ), ( 100.2, 0.2, 0 ) ] ]
-                            ]
-                    }
-                , geomTest "GeometryCollection"
-                    { json =
-                        """
+                , expected =
+                    MultiPolygon
+                        [ [ [ ( 102, 2, 0 ), ( 103, 2, 0 ), ( 103, 3, 0 ), ( 102, 3, 0 ), ( 102, 2, 0 ) ] ]
+                        , [ [ ( 100, 0, 0 ), ( 101, 0, 0 ), ( 101, 1, 0 ), ( 100, 1, 0 ), ( 100, 0, 0 ) ], [ ( 100.2, 0.2, 0 ), ( 100.8, 0.2, 0 ), ( 100.8, 0.8, 0 ), ( 100.2, 0.8, 0 ), ( 100.2, 0.2, 0 ) ] ]
+                        ]
+                }
+            , geomTest "GeometryCollection"
+                { json =
+                    """
                         { "type": "GeometryCollection",
                           "geometries": [
                             { "type": "Point",
@@ -295,18 +290,18 @@ geometryExamples =
                          ]
                       }
                     """
-                    , expected =
-                        GeometryCollection
-                            [ Point ( 100, 0, 0 )
-                            , LineString [ ( 101, 0, 0 ), ( 102, 1, 0 ) ]
-                            ]
-                    }
-                ]
-            , describe "from RFC 7946"
-                [ test "Section 1.5" <|
-                    \_ ->
-                        decodeString decoder
-                            """
+                , expected =
+                    GeometryCollection
+                        [ Point ( 100, 0, 0 )
+                        , LineString [ ( 101, 0, 0 ), ( 102, 1, 0 ) ]
+                        ]
+                }
+            ]
+        , describe "from RFC 7946"
+            [ test "Section 1.5" <|
+                \_ ->
+                    decodeString decoder
+                        """
                     {
                        "type": "FeatureCollection",
                        "features": [{
@@ -356,41 +351,40 @@ geometryExamples =
                        }]
                    }
                    """
-                            |> Expect.equal
-                                (Ok
-                                    ( FeatureCollection
-                                        ([ { geometry = Just (Point ( 102, 0.5, 0 ))
-                                           , properties = Json.Encode.object [ ( "prop0", Json.Encode.string "value0" ) ]
-                                           , id = Nothing
-                                           }
-                                         , { geometry = Just (LineString [ ( 102, 0, 0 ), ( 103, 1, 0 ), ( 104, 0, 0 ), ( 105, 1, 0 ) ])
-                                           , properties =
-                                                Json.Encode.object
-                                                    [ ( "prop0", Json.Encode.string "value0" ), ( "prop1", Json.Encode.int 0 ) ]
-                                           , id = Nothing
-                                           }
-                                         , { geometry =
-                                                Just
-                                                    (Polygon
-                                                        [ [ ( 100, 0, 0 ), ( 101, 0, 0 ), ( 101, 1, 0 ), ( 100, 1, 0 ), ( 100, 0, 0 ) ] ]
-                                                    )
-                                           , properties =
-                                                Json.Encode.object
-                                                    [ ( "prop0", Json.Encode.string "value0" )
-                                                    , ( "prop1"
-                                                      , Json.Encode.object [ ( "this", Json.Encode.string "that" ) ]
-                                                      )
-                                                    ]
-                                           , id = Nothing
-                                           }
-                                         ]
-                                        )
-                                    , Nothing
-                                    )
+                        |> Expect.equal
+                            (Ok
+                                ( FeatureCollection
+                                    [ { geometry = Just (Point ( 102, 0.5, 0 ))
+                                      , properties = Json.Encode.object [ ( "prop0", Json.Encode.string "value0" ) ]
+                                      , id = Nothing
+                                      }
+                                    , { geometry = Just (LineString [ ( 102, 0, 0 ), ( 103, 1, 0 ), ( 104, 0, 0 ), ( 105, 1, 0 ) ])
+                                      , properties =
+                                            Json.Encode.object
+                                                [ ( "prop0", Json.Encode.string "value0" ), ( "prop1", Json.Encode.int 0 ) ]
+                                      , id = Nothing
+                                      }
+                                    , { geometry =
+                                            Just
+                                                (Polygon
+                                                    [ [ ( 100, 0, 0 ), ( 101, 0, 0 ), ( 101, 1, 0 ), ( 100, 1, 0 ), ( 100, 0, 0 ) ] ]
+                                                )
+                                      , properties =
+                                            Json.Encode.object
+                                                [ ( "prop0", Json.Encode.string "value0" )
+                                                , ( "prop1"
+                                                  , Json.Encode.object [ ( "this", Json.Encode.string "that" ) ]
+                                                  )
+                                                ]
+                                      , id = Nothing
+                                      }
+                                    ]
+                                , Nothing
                                 )
-                , geomTest "Antimeridian cutting 1"
-                    { json =
-                        """
+                            )
+            , geomTest "Antimeridian cutting 1"
+                { json =
+                    """
                                     {
                                         "type": "MultiLineString",
                                         "coordinates": [
@@ -402,11 +396,11 @@ geometryExamples =
                                         ]
                                     }
                                     """
-                    , expected = MultiLineString [ [ ( 170, 45, 0 ), ( 180, 45, 0 ) ], [ ( -180, 45, 0 ), ( -170, 45, 0 ) ] ]
-                    }
-                , geomTest "Antimeridian cutting 2"
-                    { json =
-                        """
+                , expected = MultiLineString [ [ ( 170, 45, 0 ), ( 180, 45, 0 ) ], [ ( -180, 45, 0 ), ( -170, 45, 0 ) ] ]
+                }
+            , geomTest "Antimeridian cutting 2"
+                { json =
+                    """
                         {
                             "type": "MultiPolygon",
                             "coordinates": [
@@ -425,14 +419,14 @@ geometryExamples =
                             ]
                         }
                                     """
-                    , expected =
-                        MultiPolygon
-                            [ [ [ ( 180, 40, 0 ), ( 180, 50, 0 ), ( 170, 50, 0 ), ( 170, 40, 0 ), ( 180, 40, 0 ) ] ], [ [ ( -170, 40, 0 ), ( -170, 50, 0 ), ( -180, 50, 0 ), ( -180, 40, 0 ), ( -170, 40, 0 ) ] ] ]
-                    }
-                , test "bounding box, section 5" <|
-                    \_ ->
-                        decodeString decoder
-                            """
+                , expected =
+                    MultiPolygon
+                        [ [ [ ( 180, 40, 0 ), ( 180, 50, 0 ), ( 170, 50, 0 ), ( 170, 40, 0 ), ( 180, 40, 0 ) ] ], [ [ ( -170, 40, 0 ), ( -170, 50, 0 ), ( -180, 50, 0 ), ( -180, 40, 0 ), ( -170, 40, 0 ) ] ] ]
+                }
+            , test "bounding box, section 5" <|
+                \_ ->
+                    decodeString decoder
+                        """
                     {
                         "type": "Feature",
                         "bbox": [-10.0, -10.0, 10.0, 10.0],
@@ -450,15 +444,15 @@ geometryExamples =
                         "properties": {}
                     }
                     """
-                            |> Expect.equal
-                                (Ok
-                                    ( Feature
-                                        { geometry = Just (Polygon [ [ ( -10, -10, 0 ), ( 10, -10, 0 ), ( 10, 10, 0 ), ( -10, -10, 0 ) ] ])
-                                        , properties = emptyObject
-                                        , id = Nothing
-                                        }
-                                    , Just [ -10, -10, 10, 10 ]
-                                    )
+                        |> Expect.equal
+                            (Ok
+                                ( Feature
+                                    { geometry = Just (Polygon [ [ ( -10, -10, 0 ), ( 10, -10, 0 ), ( 10, 10, 0 ), ( -10, -10, 0 ) ] ])
+                                    , properties = emptyObject
+                                    , id = Nothing
+                                    }
+                                , Just [ -10, -10, 10, 10 ]
                                 )
-                ]
+                            )
             ]
+        ]
