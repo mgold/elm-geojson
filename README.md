@@ -1,5 +1,7 @@
 # elm-geojson
 
+[![Build Status](https://travis-ci.org/mgold/elm-geojson.svg?branch=master)](https://travis-ci.org/mgold/elm-geojson)
+
 ```
 elm install mgold/elm-geojson
 ```
